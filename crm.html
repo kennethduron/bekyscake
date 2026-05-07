@@ -1,0 +1,367 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" type="image/png" href="assets/bekys_icon.png" />
+  <link rel="apple-touch-icon" href="assets/bekys_icon.png" />
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#5b2e1f" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Beky's CRM" />
+  <title>Beky's Cake · CRM</title>
+  <meta name="description"
+    content="CRM de Beky's Cake, pastelería profesional: seguimiento de pedidos, métricas y cotizaciones." />
+  <meta name="subject" content="Pastelería Profesional" />
+  <meta name="robots" content="noindex,nofollow" />
+  <meta name="supabase-functions-url" content="https://ztplumosskyqnewjreyc.supabase.co/functions/v1" />
+  <meta name="supabase-anon-key" content="sb_publishable_K0t1wXx9-t6DHNwS9-V-eQ_sLrbdeJW" />
+  <meta name="firebase-vapid-key" content="BCnRuJUEauWshpCHUbJnzMF99W1TlV7Ed9uPn5qbwSWGthq2dGMndOMETcQcZxgObVoyrj9GnZmmz_5FIbdJ9g" />
+  <link rel="stylesheet" href="css/style.css" />
+  <script type="module" defer src="js/crm.js?v=20260416-3"></script>
+</head>
+
+<body class="crm-page">
+  <header class="crm-top">
+    <nav class="nav">
+      <div class="nav-inner">
+        <a class="brand" href="#top">
+          <img class="brand-logo" src="assets/bekys_logo.jpeg" alt="Beky's Cake logo" />
+          <span class="brand-text">Beky's Cake</span>
+        </a>
+        <div class="nav-right">
+          <button class="lang-toggle" id="lang-toggle" type="button" aria-label="Toggle language">ES</button>
+          <button class="btn ghost nav-logout hidden" id="sign-out" data-i18n="crm_sign_out">Cerrar sesión</button>
+        </div>
+      </div>
+    </nav>
+  </header>
+
+  <div class="auth-panel" id="auth-panel">
+    <form id="login-form">
+      <h2 data-i18n="crm_login_title">Ingresar al CRM</h2>
+      <p data-i18n="crm_login_subtitle">Utiliza tus credenciales de representante para acceder.</p>
+      <label for="auth-identifier"><span data-i18n="crm_login_email">Usuario o correo</span></label>
+      <input type="text" id="auth-identifier" placeholder="usuario o correo" required />
+      <label for="auth-password"><span data-i18n="crm_login_password">Contraseña</span></label>
+      <input type="password" id="auth-password" placeholder="********" required />
+      <button class="btn primary" type="submit" data-i18n="crm_login_submit">Entrar</button>
+      <p class="auth-message" id="auth-message" aria-live="polite"></p>
+    </form>
+  </div>
+  <div class="crm-body locked" id="crm-body">
+    <main>
+      <section id="dashboard" class="crm">
+        <div class="section-heading">
+          <p class="eyebrow" data-i18n="crm_panel_eyebrow">Panel</p>
+          <h2 data-i18n="crm_panel_title">Resumen del día</h2>
+          <p data-i18n="crm_panel_subtitle">Este módulo muestra datos preliminares; en cuanto conectes Supabase todo se
+            actualizará automáticamente.</p>
+        </div>
+        <div class="crm-grid">
+          <div class="crm-panel crm-panel--wide summary-panel">
+            <div class="summary-header">
+              <div>
+                <h3 data-i18n="crm_summary_title">Resumen (Hoy)</h3>
+                <p class="summary-subtitle" data-i18n="crm_summary_subtitle">
+                  Gestión operacional en tiempo real para representantes.
+                </p>
+                <div class="summary-meta-row">
+                  <p class="summary-meta" id="summary-meta">ops@bekyscake.com · Rol: agent</p>
+                  <div class="sync-status" id="sync-status" data-state="offline">
+                    <span class="sync-dot" aria-hidden="true"></span>
+                    <span id="sync-status-text" data-i18n="crm_sync_offline">Sin conexión</span>
+                  </div>
+                </div>
+              </div>
+              <div class="summary-tabs" role="tablist" aria-label="Resumen">
+                <button class="summary-tab active" type="button" data-range="day"
+                  data-i18n="crm_summary_tab_day">Hoy</button>
+                <button class="summary-tab" type="button" data-range="week"
+                  data-i18n="crm_summary_tab_week">Semana</button>
+                <button class="summary-tab" type="button" data-range="month"
+                  data-i18n="crm_summary_tab_month">Mes</button>
+              </div>
+            </div>
+            <div class="summary-range" id="summary-range-label">Resumen (Hoy)</div>
+            <div class="summary-grid">
+              <div class="summary-block">
+                <h4 data-i18n="crm_summary_ops">Operación</h4>
+                <div class="summary-cards">
+                  <article class="summary-card">
+                    <p data-i18n="crm_summary_orders">Pedidos</p>
+                    <strong id="summary-orders">0</strong>
+                  </article>
+                  <article class="summary-card accent-warm">
+                    <p data-i18n="crm_summary_pending">Pendientes</p>
+                    <strong id="summary-pending">0</strong>
+                  </article>
+                  <article class="summary-card accent-amber">
+                    <p data-i18n="crm_summary_prep">En preparación</p>
+                    <strong id="summary-prep">0</strong>
+                  </article>
+                  <article class="summary-card accent-cool">
+                    <p data-i18n="crm_summary_ready">Listos</p>
+                    <strong id="summary-ready">0</strong>
+                  </article>
+                  <article class="summary-card accent-mint">
+                    <p data-i18n="crm_summary_delivered">Entregados</p>
+                    <strong id="summary-delivered">0</strong>
+                  </article>
+                  <article class="summary-card accent-rose">
+                    <p data-i18n="crm_summary_reservations">Reservas</p>
+                    <strong id="summary-reservations">0</strong>
+                  </article>
+                </div>
+              </div>
+              <div class="summary-block">
+                <h4 data-i18n="crm_summary_sales">Ventas</h4>
+                <div class="summary-cards summary-cards--sales">
+                  <article class="summary-card accent-blue">
+                    <p data-i18n="crm_summary_revenue">Ingresos</p>
+                    <strong id="summary-revenue">L 0.00</strong>
+                  </article>
+                  <article class="summary-card accent-blue">
+                    <p data-i18n="crm_summary_ticket">Ticket promedio</p>
+                    <strong id="summary-ticket">L 0.00</strong>
+                  </article>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="crm-panel crm-panel--wide calendar-panel">
+            <div class="calendar-header">
+              <div>
+                <h3 data-i18n="crm_calendar_title">Calendario de ventas</h3>
+                <p class="calendar-subtitle" data-i18n="crm_calendar_subtitle">
+                  Selecciona fecha para revisar ventas entregadas y sus pedidos.
+                </p>
+              </div>
+              <div class="calendar-nav">
+                <button class="calendar-btn" id="calendar-prev" type="button" aria-label="Mes anterior">‹</button>
+                <div class="calendar-month" id="calendar-month-label">Marzo de 2026</div>
+                <button class="calendar-btn" id="calendar-next" type="button" aria-label="Mes siguiente">›</button>
+              </div>
+            </div>
+            <div class="calendar calendar-shell" id="calendar"></div>
+            <div class="calendar-detail">
+              <div class="calendar-detail-header">
+                <div>
+                  <h4 id="day-detail-title" data-i18n="crm_day_detail_title">Detalle del día</h4>
+                </div>
+                <div class="calendar-detail-search">
+                  <label class="sr-only" for="day-search" data-i18n="crm_day_search_label">Buscar pedidos</label>
+                  <input type="search" id="day-search" data-i18n-placeholder="crm_day_search_ph"
+                    placeholder="Buscar por cliente, número o producto" />
+                </div>
+              </div>
+              <div class="day-controls">
+                <div class="day-metrics">
+                  <div class="metric-card">
+                    <p data-i18n="crm_day_orders">Pedidos</p>
+                    <strong id="day-orders">0</strong>
+                  </div>
+                  <div class="metric-card">
+                    <p data-i18n="crm_day_revenue">Ingresos</p>
+                    <strong id="day-revenue">L 0.00</strong>
+                  </div>
+                </div>
+              </div>
+              <ul class="day-order-list" id="daily-orders"></ul>
+              <div class="day-products">
+                <h5 data-i18n="crm_day_products_title">Productos vendidos</h5>
+                <ul class="day-products-list" id="day-products"></ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+
+      <section id="orders-section" class="crm orders-section">
+        <div class="section-heading">
+          <p class="eyebrow" data-i18n="crm_orders_eyebrow">Gestión</p>
+          <h2 data-i18n="crm_orders_heading">Pedidos</h2>
+          <p data-i18n="crm_orders_subtitle">Revisa y organiza tus pedidos por estado.</p>
+        </div>
+        <div class="crm-panel">
+          <div class="order-filters order-filters--pills">
+            <button class="filter-pill active" type="button" data-status="all" data-i18n="crm_filter_all">Todos</button>
+            <button class="filter-pill" type="button" data-status="pending"
+              data-i18n="crm_filter_pending">Pendiente</button>
+            <button class="filter-pill" type="button" data-status="prep" data-i18n="crm_filter_prep">En
+              preparación</button>
+            <button class="filter-pill" type="button" data-status="ready" data-i18n="crm_filter_ready">Listo</button>
+            <button class="filter-pill" type="button" data-status="delivered"
+              data-i18n="crm_filter_delivered">Entregado</button>
+          </div>
+          <div class="order-cards" id="orders-cards"></div>
+        </div>
+      </section>
+
+      <section class="crm notifications-panel">
+        <div class="section-heading">
+          <p class="eyebrow" data-i18n="crm_notifications_title">Notificaciones</p>
+          <h2 data-i18n="crm_notifications_title">Notificaciones</h2>
+          <p data-i18n="crm_notifications_body">
+            Recibe alertas en tu celular o computadora cuando haya nuevos pedidos o cotizaciones.
+          </p>
+        </div>
+        <div class="crm-grid">
+          <div class="crm-panel notifications-card">
+            <div class="notifications-actions">
+              <button class="btn primary" type="button" id="enable-notifications"
+                data-i18n="crm_notifications_enable">Activar notificaciones</button>
+              <button class="btn ghost hidden" type="button" id="disable-notifications"
+                data-i18n="crm_notifications_disable">Desactivar</button>
+            </div>
+            <p class="notification-message" id="notification-message" aria-live="polite"></p>
+          </div>
+        </div>
+      </section>
+
+      <section class="quotes-panel">
+        <div class="section-heading">
+          <p class="eyebrow" data-i18n="crm_quotes_eyebrow">Cotizaciones</p>
+          <h2 data-i18n="crm_quotes_title">Solicitudes recientes</h2>
+          <p data-i18n="crm_quotes_subtitle">Revisa lo que tus clientes han pedido para planificar sabores, fechas y
+            contactos.</p>
+        </div>
+        <div class="crm-grid">
+          <div class="crm-panel">
+            <ul class="quote-list" id="quote-list"></ul>
+          </div>
+        </div>
+      </section>
+    </main>
+    <footer class="footer">
+      <p data-i18n="crm_footer">© Beky's Cake 2026 · CRM operativo · Datos listos para enlazar con Firebase.</p>
+    </footer>
+  </div>
+
+  <div class="modal hidden" id="order-modal" aria-hidden="true">
+    <div class="modal-backdrop" data-close="true"></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="order-modal-title">
+      <button class="modal-close" type="button" data-close="true" aria-label="Cerrar">×</button>
+      <div class="modal-header">
+        <div>
+          <p class="modal-eyebrow" data-i18n="crm_modal_eyebrow">Pedido</p>
+          <h3 id="order-modal-title">#</h3>
+        </div>
+        <span class="order-status" id="order-modal-status">Pendiente</span>
+      </div>
+      <div class="modal-body">
+        <div class="modal-grid">
+          <div>
+            <span data-i18n="crm_detail_customer">Cliente</span>
+            <strong id="order-modal-client">-</strong>
+          </div>
+          <div>
+            <span data-i18n="crm_detail_phone">Teléfono</span>
+            <strong id="order-modal-phone">-</strong>
+          </div>
+          <div>
+            <span data-i18n="crm_detail_total">Total</span>
+            <strong id="order-modal-total">-</strong>
+          </div>
+          <div>
+            <span data-i18n="crm_detail_date">Fecha</span>
+            <strong id="order-modal-date">-</strong>
+          </div>
+          <div>
+            <span data-i18n="crm_detail_payment_status">Estado de pago</span>
+            <strong id="order-modal-payment-status">-</strong>
+          </div>
+          <div>
+            <span data-i18n="crm_detail_payment_method">Metodo de pago</span>
+            <strong id="order-modal-payment-method">-</strong>
+          </div>
+        </div>
+        <div class="modal-items">
+          <span data-i18n="crm_detail_items">Productos</span>
+          <ul id="order-modal-items"></ul>
+        </div>
+        <div class="modal-notes" id="order-modal-notes">
+          <div class="modal-section-head">
+            <span data-i18n="crm_detail_notes">Notas</span>
+            <span class="modal-note-badge" id="order-modal-notes-badge"></span>
+          </div>
+          <textarea id="order-modal-notes-input" rows="4"
+            placeholder="Actualiza las notas del cliente cuando sea necesario."
+            data-i18n-placeholder="crm_notes_ph"></textarea>
+          <p class="modal-helper" id="order-modal-notes-help"></p>
+          <div class="modal-inline-message" id="order-modal-notes-message" data-tone="info" data-state="idle"
+            aria-live="polite">
+            <span class="modal-inline-dot" aria-hidden="true"></span>
+            <span id="order-modal-notes-message-text">Guardado</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn ghost modal-btn-close" type="button" data-close="true"
+          data-i18n="crm_modal_close">Cerrar</button>
+        <button class="btn primary modal-primary modal-btn-next" type="button" id="order-next-status"
+          data-i18n="crm_modal_next">Siguiente
+          estado</button>
+        <button class="btn ghost danger compact modal-btn-reject" type="button" id="order-reject"
+          data-i18n="crm_action_reject">Rechazar</button>
+        <button class="btn ghost danger compact hidden modal-btn-delete" type="button" id="order-delete"
+          data-i18n="crm_action_delete">Eliminar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="confirm-delete-modal" aria-hidden="true">
+    <div class="modal-backdrop" data-close="true"></div>
+    <div class="modal-card modal-card--compact" role="dialog" aria-modal="true" aria-labelledby="confirm-delete-title">
+      <button class="modal-close" type="button" data-close="true" aria-label="Cerrar">×</button>
+      <div class="modal-header">
+        <div>
+          <p class="modal-eyebrow" data-i18n="crm_quote_eyebrow">Cotización</p>
+          <h3 id="confirm-delete-title" data-i18n="crm_delete_title">¿Eliminar pedido?</h3>
+        </div>
+      </div>
+      <div class="modal-body">
+        <p class="modal-message" data-i18n="crm_delete_body">
+          Esta acción no se puede deshacer.
+        </p>
+      </div>
+      <div class="modal-actions">
+        <button class="btn ghost" type="button" id="confirm-delete-cancel"
+          data-i18n="crm_delete_cancel">Cancelar</button>
+        <button class="btn danger" type="button" id="confirm-delete-yes" data-i18n="crm_delete_confirm">Sí,
+          eliminar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="confirm-quote-delete-modal" aria-hidden="true">
+    <div class="modal-backdrop" data-close="true"></div>
+    <div class="modal-card modal-card--compact" role="dialog" aria-modal="true"
+      aria-labelledby="confirm-quote-delete-title">
+      <button class="modal-close" type="button" data-close="true" aria-label="Cerrar">×</button>
+      <div class="modal-header">
+        <div>
+          <p class="modal-eyebrow" data-i18n="crm_delete_eyebrow">Pedido</p>
+          <h3 id="confirm-quote-delete-title" data-i18n="crm_quote_delete_title">¿Eliminar cotización?</h3>
+        </div>
+      </div>
+      <div class="modal-body">
+        <p class="modal-message" data-i18n="crm_quote_delete_body">
+          Esta acción no se puede deshacer.
+        </p>
+      </div>
+      <div class="modal-actions">
+        <button class="btn ghost" type="button" id="confirm-quote-delete-cancel"
+          data-i18n="crm_delete_cancel">Cancelar</button>
+        <button class="btn danger" type="button" id="confirm-quote-delete-yes" data-i18n="crm_delete_confirm">Sí,
+          eliminar</button>
+      </div>
+    </div>
+  </div>
+  <div class="crm-toast hidden" id="crm-toast" role="status" aria-live="polite"></div>
+</body>
+
+</html>

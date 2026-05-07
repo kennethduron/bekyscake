@@ -1,0 +1,11 @@
+*firebase-adminsdk*.json
+*service-account*.json
+firebase-debug.log
+.env
+.env.*
+.firebase/
+.firebase-config/
+.npm-cache/
+.tools/
+node_modules/
+supabase/.temp/

@@ -1,0 +1,24 @@
+{
+  "name": "Beky's Cake CRM",
+  "short_name": "Beky's CRM",
+  "description": "Panel de pedidos y cotizaciones de Beky's Cake.",
+  "start_url": "/crm",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f6ebe2",
+  "theme_color": "#5b2e1f",
+  "icons": [
+    {
+      "src": "/assets/bekys_icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/assets/bekys_icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

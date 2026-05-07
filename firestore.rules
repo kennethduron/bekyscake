@@ -1,0 +1,90 @@
+rules_version = "2";
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /_counters/{docId} {
+      allow read, write: if false;
+    }
+
+    match /_rate_limits/{docId} {
+      allow read, write: if false;
+    }
+
+    function customerNotesFieldsOnly() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        "notes",
+        "customerNotesEdited",
+        "customerNotesEditedAt",
+        "updatedAt",
+        "notesUpdatedAt"
+      ]);
+    }
+
+    function customerNotesEditAllowed() {
+      return request.auth == null
+        && customerNotesFieldsOnly()
+        && resource.data.customerNotesEdited != true
+        && request.resource.data.customerNotesEdited == true
+        && request.resource.data.notes is string
+        && request.resource.data.updatedAt is timestamp
+        && request.resource.data.notesUpdatedAt is timestamp
+        && request.resource.data.customerNotesEditedAt is timestamp;
+    }
+
+    match /users/{userId} {
+      allow read, write: if false;
+    }
+
+    match /users/{userId}/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /orders/{orderId} {
+      allow create: if false;
+      allow read, delete: if request.auth != null;
+      allow update: if request.auth != null
+        || (
+          customerNotesEditAllowed()
+          && resource.data.trackingKey is string
+          && request.resource.data.trackingKey == resource.data.trackingKey
+          && request.resource.data.clientOrderId == resource.data.clientOrderId
+        );
+    }
+
+    match /order_tracking/{trackingId} {
+      allow create: if false;
+      allow get: if true;
+      allow list: if false;
+      allow delete: if request.auth != null;
+      allow update: if request.auth != null
+        || (
+          customerNotesEditAllowed()
+          && resource.data.trackingKey == trackingId
+          && request.resource.data.trackingKey == trackingId
+        );
+    }
+
+    match /quotes/{quoteId} {
+      allow create: if false;
+      allow read, update, delete: if request.auth != null;
+    }
+
+    match /dashboard/{docId} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /notification_tokens/{tokenId} {
+      allow create: if request.auth != null
+        && request.resource.data.token is string
+        && request.resource.data.token == tokenId;
+      allow update: if request.auth != null
+        && request.resource.data.token is string
+        && request.resource.data.token == resource.data.token;
+      allow read, delete: if request.auth != null;
+    }
+
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
