@@ -12,6 +12,9 @@ const apiFunctions = {
   resolveCrmIdentity: "resolve-crm-identity",
 };
 
+const backendApiUrlMeta = document.querySelector('meta[name="backend-api-url"]')?.content.trim().replace(/\/$/, "") || "";
+const backendApiUrl =
+  window.location.hostname.endsWith("github.io") && backendApiUrlMeta.startsWith("/") ? "" : backendApiUrlMeta;
 const supabaseFunctionsUrl =
   document.querySelector('meta[name="supabase-functions-url"]')?.content.trim().replace(/\/$/, "") || "";
 const supabaseAnonKey = document.querySelector('meta[name="supabase-anon-key"]')?.content.trim() || "";
@@ -83,6 +86,32 @@ async function postSupabaseFunction(functionName, payload = {}, options = {}) {
 
   if (!response.ok || data?.ok === false) {
     throw new Error(data?.error || `Supabase function failed: ${response.status}`);
+  }
+
+  return data || { ok: true };
+}
+
+async function postPublicBackendFunction(functionName, payload = {}) {
+  if (!backendApiUrl) {
+    return postSupabaseFunction(functionName, payload);
+  }
+  const response = await fetch(`${backendApiUrl}/${functionName}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload || {}),
+  });
+
+  let data = null;
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
+
+  if (!response.ok || data?.ok === false) {
+    throw new Error(data?.error || `Backend function failed: ${response.status}`);
   }
 
   return data || { ok: true };
@@ -335,7 +364,7 @@ export async function fetchCalendarStatuses() {
 
 export async function saveOrder(payload) {
   try {
-    const response = await postSupabaseFunction("submit-order", {
+    const response = await postPublicBackendFunction("submit-order", {
       client: String(payload?.client || "").trim(),
       phone: String(payload?.phone || "").trim(),
       notes: String(payload?.notes || "").trim(),
@@ -355,7 +384,7 @@ export async function saveOrder(payload) {
 
 export async function saveQuote(payload) {
   try {
-    await postSupabaseFunction("submit-quote", {
+    await postPublicBackendFunction("submit-quote", {
       name: String(payload?.name || "").trim(),
       email: String(payload?.email || "").trim().toLowerCase(),
       phone: String(payload?.phone || "").trim(),
@@ -435,7 +464,7 @@ export function subscribeTrackingOrders(trackingKeys, onData, onError) {
 
   return createPollingSubscription(
     async () => {
-      const response = await postSupabaseFunction("customer-track-orders", { trackingKeys: keys });
+      const response = await postPublicBackendFunction("customer-track-orders", { trackingKeys: keys });
       return Array.isArray(response?.items) ? response.items : [];
     },
     (items) => onData?.(items),
@@ -464,7 +493,7 @@ export async function updateOrderStatus(orderId, status) {
 export async function updateOrderNotes({ orderId, trackingKey = "", notes = "", mode = "crm" } = {}) {
   try {
     if (mode === "customer") {
-      await postSupabaseFunction("customer-update-order-notes", {
+      await postPublicBackendFunction("customer-update-order-notes", {
         orderId: String(orderId || "").trim(),
         trackingKey: String(trackingKey || "").trim(),
         notes: String(notes || ""),
@@ -576,6 +605,53 @@ export async function registerForOrderNotifications({ vapidKey, deviceLabel = ""
     ok: true,
     token,
   };
+}
+
+export async function refreshOrderNotificationRegistration({ vapidKey, deviceLabel = "" } = {}) {
+  const normalizedVapid = String(vapidKey || "").trim();
+  if (!normalizedVapid || normalizedVapid.includes("REEMPLAZA_CON_TU_VAPID_KEY")) {
+    return { ok: false, reason: "missing-vapid" };
+  }
+  const supportIssue = getBrowserNotificationSupportIssue();
+  if (supportIssue) {
+    return { ok: false, reason: supportIssue };
+  }
+  if (Notification.permission !== "granted") {
+    return { ok: false, reason: Notification.permission === "denied" ? "denied" : "permission-required" };
+  }
+
+  const messaging = await getMessagingClient();
+  if (!messaging) {
+    return { ok: false, reason: "unsupported" };
+  }
+  const serviceWorkerRegistration = await getMessagingServiceWorkerRegistration();
+  if (!serviceWorkerRegistration) {
+    return { ok: false, reason: "service-worker" };
+  }
+
+  let token = "";
+  try {
+    token = normalizeNotificationToken(await getToken(messaging, {
+      vapidKey: normalizedVapid,
+      serviceWorkerRegistration,
+    }));
+  } catch (error) {
+    console.warn("No se pudo refrescar token push de Firebase Messaging:", error);
+    return { ok: false, reason: getMessagingFailureReason(error, "token") };
+  }
+  if (!token) return { ok: false, reason: "token" };
+
+  try {
+    await postSupabaseCrmFunction({
+      action: "register_notification_token",
+      token,
+      deviceLabel: normalizeDeviceLabel(deviceLabel || navigator?.platform || "web"),
+    });
+  } catch (error) {
+    console.warn("No se pudo refrescar token push en CRM:", error);
+    return { ok: false, reason: getMessagingFailureReason(error, "register") };
+  }
+  return { ok: true, token };
 }
 
 export async function unregisterForOrderNotifications(token) {

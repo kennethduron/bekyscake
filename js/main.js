@@ -27,6 +27,9 @@ const paypalCurrency = (
 const paypalUsdRateMeta = document.querySelector('meta[name="paypal-usd-rate"]')?.content.trim() || "";
 const paypalUsdRateParsed = Number(paypalUsdRateMeta);
 const paypalUsdRate = Number.isFinite(paypalUsdRateParsed) && paypalUsdRateParsed > 0 ? paypalUsdRateParsed : null;
+const backendApiUrlMeta = document.querySelector('meta[name="backend-api-url"]')?.content.trim().replace(/\/$/, "") || "";
+const backendApiUrl =
+  window.location.hostname.endsWith("github.io") && backendApiUrlMeta.startsWith("/") ? "" : backendApiUrlMeta;
 const supabaseFunctionsUrl =
   document.querySelector('meta[name="supabase-functions-url"]')?.content.trim().replace(/\/$/, "") || "";
 const supabaseAnonKey = document.querySelector('meta[name="supabase-anon-key"]')?.content.trim() || "";
@@ -1647,9 +1650,7 @@ async function finalizeOrderSubmission(orderPayload, successMessageKey = "order_
 }
 
 function hasPayNowConfig() {
-  return Boolean(
-    paypalClientId && supabaseFunctionsUrl && supabaseAnonKey && paymentChoiceModal && paypalCheckoutModal
-  );
+  return Boolean(paypalClientId && (backendApiUrl || (supabaseFunctionsUrl && supabaseAnonKey)) && paymentChoiceModal && paypalCheckoutModal);
 }
 
 function isDesktopFileProtocol() {
@@ -1683,8 +1684,27 @@ async function postSupabaseFunction(functionName, payload = {}) {
   return data;
 }
 
+async function postBackendFunction(functionName, payload = {}) {
+  if (!backendApiUrl) {
+    return postSupabaseFunction(functionName, payload);
+  }
+  const endpoint = `${backendApiUrl}/${functionName}`;
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data?.ok === false) {
+    throw new Error(data?.error || `Backend function failed: ${response.status}`);
+  }
+  return data;
+}
+
 async function createPayPalOrder(draft) {
-  return postSupabaseFunction("paypal-create-order", {
+  return postBackendFunction("paypal-create-order", {
     client: draft.client,
     phone: draft.phone,
     notes: draft.notes,
@@ -1696,7 +1716,7 @@ async function createPayPalOrder(draft) {
 }
 
 async function capturePayPalOrder({ paypalOrderId, internalOrderId = "" }) {
-  return postSupabaseFunction("paypal-capture-order", {
+  return postBackendFunction("paypal-capture-order", {
     paypalOrderId,
     internalOrderId,
   });

@@ -14,6 +14,7 @@ import {
   logout,
   observeAuthState,
   registerForOrderNotifications,
+  refreshOrderNotificationRegistration,
   unregisterForOrderNotifications,
   listenForForegroundMessages,
 } from "./firebase-client.js";
@@ -56,6 +57,8 @@ let titleBlinkTimer = null;
 let baseTitle = document.title;
 let displayIdMap = {};
 let pendingDeepLinkOrderId = "";
+let notificationRefreshInProgress = false;
+let lastNotificationRefreshAt = 0;
 let orderNotesSaving = false;
 let orderNotesSavingOrderId = "";
 let orderNotesOriginalValue = "";
@@ -656,6 +659,32 @@ async function ensureForegroundMessagesListener() {
       : t("crm_notifications_foreground");
     setNotificationMessage(message, "success");
   });
+}
+
+async function refreshStoredNotificationRegistration() {
+  const storedToken = localStorage.getItem(notificationsTokenKey);
+  if (!storedToken || notificationRefreshInProgress) return;
+  if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+  const now = Date.now();
+  if (now - lastNotificationRefreshAt < 5 * 60 * 1000) return;
+
+  notificationRefreshInProgress = true;
+  lastNotificationRefreshAt = now;
+  try {
+    const result = await refreshOrderNotificationRegistration({
+      vapidKey: vapidPublicKey,
+      deviceLabel: typeof navigator !== "undefined" ? navigator.platform || "web" : "web",
+    });
+    if (result?.ok && result.token) {
+      localStorage.setItem(notificationsTokenKey, result.token);
+      updateNotificationButtons(true);
+      void ensureForegroundMessagesListener();
+    }
+  } catch (error) {
+    console.warn("No se pudo refrescar el registro de notificaciones:", error);
+  } finally {
+    notificationRefreshInProgress = false;
+  }
 }
 
 function showCrmToast(message) {
@@ -2316,6 +2345,7 @@ function unlockDashboard() {
   document.body.classList.remove("menu-open");
   setSyncStatus("loading");
   startRealtimeListeners();
+  void refreshStoredNotificationRegistration();
   if (!dataLoaded) {
     dataLoaded = true;
     loadRemoteData();

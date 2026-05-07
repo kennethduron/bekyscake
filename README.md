@@ -1,12 +1,13 @@
-# Beky's Cake Web (Supabase-first)
+# Beky's Cake Web (Vercel + Supabase)
 
-Sitio web y CRM de Beky's Cake con frontend estatico (HTML/CSS/JS) y backend en Supabase Edge Functions.
+Sitio web y CRM de Beky's Cake con frontend estatico (HTML/CSS/JS), backend publico en Vercel Functions y datos/auth en Supabase.
 
 ## Estado actual de arquitectura
-- Pedidos y cotizaciones publicas: Supabase (`submit-order`, `submit-quote`).
+- Pedidos y cotizaciones publicas: Vercel (`/api/submit-order`, `/api/submit-quote`).
 - CRM: Supabase (`crm-orders`) con sesion `Bearer` de Supabase Auth.
 - Login CRM: Supabase Auth (email/password) con soporte de `usuario o correo`.
-- Pagos: PayPal + Supabase Functions (`paypal-create-order`, `paypal-capture-order`).
+- Pagos: PayPal desde Vercel (`/api/paypal-create-order`, `/api/paypal-capture-order`).
+- Notificaciones: Firebase Cloud Messaging desde Vercel al CRM cuando entra una orden/cotizacion.
 
 ## Archivos clave
 - `index.html`: vista cliente.
@@ -14,6 +15,7 @@ Sitio web y CRM de Beky's Cake con frontend estatico (HTML/CSS/JS) y backend en 
 - `js/main.js`: flujo cliente (pedido/cotizacion/tracking).
 - `js/crm.js`: flujo CRM (login, panel, pedidos, cotizaciones).
 - `js/firebase-client.js`: cliente de datos/autenticacion (nombre legacy, implementacion actual en Supabase).
+- `api/*`: Vercel Functions para pedidos, pagos, tracking publico y push FCM.
 - `supabase/functions/*`: funciones Edge.
 - `supabase/migrations/*`: esquema SQL y hardening.
 - `docs/paypal-supabase-setup.md`: guia completa PayPal + Supabase.
@@ -22,6 +24,7 @@ Sitio web y CRM de Beky's Cake con frontend estatico (HTML/CSS/JS) y backend en 
 Debes tener estos meta tags configurados:
 
 ```html
+<meta name="backend-api-url" content="/api" />
 <meta name="supabase-functions-url" content="https://TU-PROYECTO.supabase.co/functions/v1" />
 <meta name="supabase-anon-key" content="TU_SUPABASE_ANON_KEY" />
 ```
@@ -60,31 +63,41 @@ select * from public.upsert_crm_user_by_email(
 
 Roles permitidos: `owner`, `admin`, `agent`, `viewer`.
 
-## Deploy de funciones
+## Variables de entorno en Vercel
+Configura estos secretos en Vercel Project Settings > Environment Variables:
+
 ```bash
-supabase functions deploy paypal-create-order --no-verify-jwt
-supabase functions deploy paypal-capture-order --no-verify-jwt
-supabase functions deploy submit-order --no-verify-jwt
-supabase functions deploy submit-quote --no-verify-jwt
-supabase functions deploy crm-orders --no-verify-jwt
-supabase functions deploy customer-track-orders --no-verify-jwt
-supabase functions deploy customer-update-order-notes --no-verify-jwt
-supabase functions deploy resolve-crm-identity --no-verify-jwt
+SUPABASE_URL=https://TU-PROYECTO.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=...
+PAYPAL_CLIENT_ID=...
+PAYPAL_CLIENT_SECRET=...
+PAYPAL_ENV=sandbox
+PAYPAL_CURRENCY=USD
+PAYPAL_USD_RATE=0.0405
+PAYMENT_ALLOWED_ORIGIN=https://TU-DOMINIO
+CRM_URL=https://TU-DOMINIO/crm
+FCM_SERVICE_ACCOUNT_JSON={"type":"service_account",...}
+FCM_ICON_URL=https://TU-DOMINIO/assets/bekys_icon.png
 ```
+
+`PAYPAL_CLIENT_SECRET`, `SUPABASE_SERVICE_ROLE_KEY` y `FCM_SERVICE_ACCOUNT_JSON` nunca deben ir en HTML ni JS publico.
 
 ## Push CRM (Firebase)
 1. En `crm.html`, define tu VAPID en:
 ```html
 <meta name="firebase-vapid-key" content="TU_VAPID_PUBLIC_KEY" />
 ```
-2. En Supabase, agrega el service account de Firebase para FCM HTTP v1 (recomendado):
+2. En Vercel, agrega el service account de Firebase para FCM HTTP v1:
 ```bash
-supabase secrets set FCM_SERVICE_ACCOUNT_JSON='{"type":"service_account",...}'
+FCM_SERVICE_ACCOUNT_JSON='{"type":"service_account",...}'
 ```
 Alternativas aceptadas:
 - `FIREBASE_SERVICE_ACCOUNT_JSON`
 - `GOOGLE_SERVICE_ACCOUNT_JSON`
-- `FIREBASE_SERVER_KEY` o `FCM_SERVER_KEY` (legacy, no recomendado)
+3. En el celular del rep:
+- Android/Chrome: abre `/crm` en HTTPS, inicia sesion y toca `Activar notificaciones`.
+- iPhone: abre `/crm` en Safari, agrega el CRM a la pantalla de inicio, abre ese icono, inicia sesion y toca `Activar notificaciones`.
+- Despues de activarlas, pueden llegar aunque el CRM este cerrado o el celular bloqueado.
 
 ## Nota
 El login CRM no depende de Firebase Auth; las notificaciones usan FCM + tokens guardados en Supabase.

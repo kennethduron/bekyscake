@@ -20,19 +20,23 @@ messaging.onBackgroundMessage((payload) => {
   const badge = payload?.notification?.badge || "/assets/bekys_icon.png";
   const link =
     payload?.fcmOptions?.link ||
+    payload?.webpush?.fcm_options?.link ||
     payload?.data?.link ||
-    "https://bekyscake.com/crm";
+    `${self.location.origin}/crm`;
 
   self.registration.showNotification(title, {
     body,
     icon,
     badge,
+    tag: payload?.data?.orderId || payload?.data?.quoteId || "bekys-crm-alert",
+    renotify: true,
+    requireInteraction: true,
     data: { link },
   });
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const target = event.notification?.data?.link || "https://bekyscake.com/crm";
+  const target = event.notification?.data?.link || `${self.location.origin}/crm`;
   event.waitUntil(clients.openWindow(target));
 });

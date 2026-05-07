@@ -9,3 +9,5 @@ firebase-debug.log
 .tools/
 node_modules/
 supabase/.temp/
+
+.vercel
