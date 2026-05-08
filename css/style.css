@@ -1849,10 +1849,17 @@ main {
 .payment-total-box strong {
   font-size: 1.08rem;
 }
+.payment-security-note {
+  margin: 10px 0 0;
+  color: #6b5142;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
 .paypal-buttons-shell {
   min-height: 52px;
   display: grid;
   align-items: center;
+  margin-top: 12px;
 }
 #payment-choice-message {
   min-height: 1.3rem;

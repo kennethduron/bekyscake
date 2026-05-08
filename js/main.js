@@ -255,13 +255,17 @@ const i18n = {
     payment_choice_subtitle: "Elige pagar ahora con PayPal o enviar tu pedido y pagar luego.",
     payment_choice_total: "Total de tu pedido",
     payment_choice_later: "Pagar luego",
-    payment_choice_now: "Pagar ahora",
+    payment_choice_now: "Pagar con PayPal",
+    payment_secure_note:
+      "El pago se procesa en PayPal. Tu pedido solo queda pagado cuando PayPal confirma el cobro.",
     payment_choice_config_missing:
       "Falta configurar PayPal/Supabase. Puedes enviar el pedido con opción Pagar luego.",
     payment_paypal_eyebrow: "Pago seguro",
     payment_paypal_title: "Pagar con PayPal",
     payment_paypal_subtitle:
       "Al continuar se abrirá la ventana segura de PayPal para pagar con tu cuenta o tarjeta.",
+    payment_paypal_secure_note:
+      "PayPal abrirá su checkout seguro. No compartimos tus datos de tarjeta con Beky's Cake.",
     payment_usd_pending: "El equivalente en USD se calculará al abrir PayPal.",
     payment_paypal_loading: "Cargando PayPal…",
     payment_paypal_processing: "Procesando pago…",
@@ -468,13 +472,17 @@ const i18n = {
     payment_choice_subtitle: "Choose Pay now with PayPal or send your order and pay later.",
     payment_choice_total: "Order total",
     payment_choice_later: "Pay later",
-    payment_choice_now: "Pay now",
+    payment_choice_now: "Pay with PayPal",
+    payment_secure_note:
+      "Payment is processed by PayPal. Your order is marked paid only after PayPal confirms the charge.",
     payment_choice_config_missing:
       "PayPal/Supabase setup is missing. You can still place the order with Pay later.",
     payment_paypal_eyebrow: "Secure checkout",
     payment_paypal_title: "Pay with PayPal",
     payment_paypal_subtitle:
       "A secure PayPal window will open so you can pay with your PayPal account or card.",
+    payment_paypal_secure_note:
+      "PayPal opens its secure checkout. Beky's Cake does not receive your card details.",
     payment_usd_pending: "USD equivalent will be calculated when PayPal opens.",
     payment_paypal_loading: "Loading PayPal…",
     payment_paypal_processing: "Processing payment…",

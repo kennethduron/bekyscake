@@ -634,10 +634,11 @@
           <span data-i18n="payment_choice_total">Total de tu pedido</span>
           <strong id="payment-choice-total">L 0.00</strong>
         </div>
+        <p class="payment-security-note" data-i18n="payment_secure_note">El pago se procesa en PayPal. Tu pedido solo queda pagado cuando PayPal confirma el cobro.</p>
       </div>
       <div class="modal-actions modal-actions--split">
         <button class="btn ghost" id="pay-later-btn" type="button" data-i18n="payment_choice_later">Pagar luego</button>
-        <button class="btn primary" id="pay-now-btn" type="button" data-i18n="payment_choice_now">Pagar ahora</button>
+        <button class="btn primary" id="pay-now-btn" type="button" data-i18n="payment_choice_now">Pagar con PayPal</button>
       </div>
       <p class="modal-helper" id="payment-choice-message" aria-live="polite"></p>
     </div>
@@ -658,6 +659,7 @@
           <span data-i18n="payment_choice_total">Total de tu pedido</span>
           <strong id="paypal-checkout-total">L 0.00</strong>
         </div>
+        <p class="payment-security-note" data-i18n="payment_paypal_secure_note">PayPal abrirá su checkout seguro. No compartimos tus datos de tarjeta con Beky's Cake.</p>
         <div id="paypal-buttons" class="paypal-buttons-shell"></div>
         <p class="modal-inline-message" id="paypal-status-message" data-tone="info" aria-live="polite"></p>
       </div>
