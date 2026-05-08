@@ -1078,6 +1078,15 @@ function getPaymentStatusLabel(paymentStatus) {
   return paymentStatus === "paid" ? t("crm_payment_paid") : t("crm_payment_pending");
 }
 
+function getEffectivePaymentStatus(order) {
+  const paymentStatus = normalizePaymentStatus(order?.paymentStatus);
+  const paymentMethod = normalizePaymentMethod(order?.paymentMethod);
+  if (paymentMethod === "pay_later" && mapOrderStatus(order?.status) === "delivered") {
+    return "paid";
+  }
+  return paymentStatus;
+}
+
 function getPaymentMethodLabel(paymentMethod) {
   return paymentMethod === "paypal"
     ? t("crm_payment_method_paypal")
@@ -1250,7 +1259,7 @@ function renderOrders() {
   normalizedOrdersCache.slice(0, 8).forEach((order) => {
     const li = document.createElement("li");
     const description = describeOrder(order);
-    const paymentLabel = getPaymentStatusLabel(normalizePaymentStatus(order.paymentStatus));
+    const paymentLabel = getPaymentStatusLabel(getEffectivePaymentStatus(order));
     const footer = `${order.time} · ${order.status || "Pendiente"} · ${paymentLabel}`;
     li.innerHTML = `<strong>${order.client}</strong><br/><span>${description}</span><br/><small>${footer}</small>`;
     list.appendChild(li);
@@ -1721,7 +1730,7 @@ function renderOrderCards() {
     card.dataset.orderId = order.id;
     const metaLine = `Hora: ${order.time || "--:--"} - ${formatCurrency(order.total)}`;
     const orderStatusClass = `status-${mapOrderStatus(order.status)}`;
-    const paymentStatus = normalizePaymentStatus(order.paymentStatus);
+    const paymentStatus = getEffectivePaymentStatus(order);
     const paymentStatusClass = getPaymentStatusClass(paymentStatus);
     const paymentLabel = getPaymentStatusLabel(paymentStatus);
     card.innerHTML = `
@@ -1907,7 +1916,7 @@ function openOrderModal(orderId, options = {}) {
   if (phone) phone.textContent = fixMojibake(order.phone || "") || "--";
   if (total) total.textContent = formatCurrency(order.total);
   if (date) date.textContent = `${order.orderDate || "--"} ${order.time || ""}`.trim();
-  const paymentStatus = normalizePaymentStatus(order.paymentStatus);
+  const paymentStatus = getEffectivePaymentStatus(order);
   const paymentMethod = normalizePaymentMethod(order.paymentMethod);
   if (paymentStatusEl) {
     paymentStatusEl.textContent = getPaymentStatusLabel(paymentStatus);
