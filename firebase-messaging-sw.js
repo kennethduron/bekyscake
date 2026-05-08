@@ -37,6 +37,33 @@ messaging.onBackgroundMessage((payload) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const target = event.notification?.data?.link || `${self.location.origin}/crm`;
-  event.waitUntil(clients.openWindow(target));
+  const rawTarget = event.notification?.data?.link || `${self.location.origin}/crm`;
+  const targetUrl = new URL(rawTarget, self.location.origin);
+
+  event.waitUntil((async () => {
+    const windowClients = await clients.matchAll({
+      type: "window",
+      includeUncontrolled: true,
+    });
+    const crmClient = windowClients.find((client) => {
+      try {
+        const clientUrl = new URL(client.url);
+        return (
+          clientUrl.origin === targetUrl.origin &&
+          (clientUrl.pathname === "/crm" || clientUrl.pathname === "/crm.html")
+        );
+      } catch {
+        return false;
+      }
+    });
+
+    if (crmClient) {
+      if ("navigate" in crmClient) {
+        await crmClient.navigate(targetUrl.href).catch(() => null);
+      }
+      return crmClient.focus();
+    }
+
+    return clients.openWindow(targetUrl.href);
+  })());
 });

@@ -149,7 +149,7 @@ module.exports = withPublicApi(async ({ req, body, origin }) => {
     });
   }
 
-  await sendCrmPushNotification({
+  const pushResult = await sendCrmPushNotification({
     title: "Nuevo pedido en Beky's Cake",
     body: `${client} - ${formatHnl(totalHnl)}`,
     link: `${process.env.CRM_URL || "https://bekyscake.com/crm"}?order=${encodeURIComponent(orderId)}`,

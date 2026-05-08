@@ -571,7 +571,9 @@ async function getGoogleAccessToken(serviceAccount) {
 
 async function fetchEnabledFcmTokens() {
   const rows = await supabaseRest("crm_notification_tokens?select=token&enabled=eq.true&limit=2000");
-  return [...new Set((rows || []).map((row) => normalizeInlineText(row.token, 4000)).filter(Boolean))];
+  const tokens = [...new Set((rows || []).map((row) => normalizeInlineText(row.token, 4000)).filter(Boolean))];
+  console.log(`[push] tokens activos encontrados: ${tokens.length}`);
+  return tokens;
 }
 
 function isInvalidFcmTokenError(text) {
@@ -592,14 +594,26 @@ async function removeInvalidFcmTokens(tokens) {
 async function sendCrmPushNotification({ title, body, link, dataPayload = {} }) {
   const normalizedTitle = normalizeInlineText(title, 120);
   const normalizedBody = normalizeInlineText(body, 240);
-  if (!normalizedTitle || !normalizedBody) return;
+  const result = { configured: false, tokenCount: 0, sent: 0, invalid: 0, errors: [] };
+  if (!normalizedTitle || !normalizedBody) {
+    console.warn("[push] omitido: titulo o cuerpo vacio.");
+    result.errors.push("empty-message");
+    return result;
+  }
   const serviceAccount = loadServiceAccountConfig();
   if (!serviceAccount) {
-    console.warn("Push omitido: configura FCM_SERVICE_ACCOUNT_JSON en Vercel.");
-    return;
+    console.warn("[push] omitido: configura FCM_SERVICE_ACCOUNT_JSON en Vercel.");
+    result.errors.push("missing-fcm-service-account");
+    return result;
   }
+  result.configured = true;
   const tokens = await fetchEnabledFcmTokens();
-  if (!tokens.length) return;
+  result.tokenCount = tokens.length;
+  if (!tokens.length) {
+    console.warn("[push] omitido: no hay tokens FCM activos en crm_notification_tokens.");
+    result.errors.push("no-active-tokens");
+    return result;
+  }
   const accessToken = await getGoogleAccessToken(serviceAccount);
   const endpoint = `https://fcm.googleapis.com/v1/projects/${encodeURIComponent(serviceAccount.projectId)}/messages:send`;
   const invalidTokens = [];
@@ -624,7 +638,7 @@ async function sendCrmPushNotification({ title, body, link, dataPayload = {} }) 
           ),
           webpush: {
             headers: {
-              TTL: "86400",
+              TTL: "2419200",
               Urgency: "high",
             },
             notification: {
@@ -642,12 +656,23 @@ async function sendCrmPushNotification({ title, body, link, dataPayload = {} }) 
         },
       }),
     });
-    if (response.ok) continue;
+    if (response.ok) {
+      console.log("[push] FCM enviado correctamente a 1 token.");
+      result.sent += 1;
+      continue;
+    }
     const errorText = await response.text().catch(() => "");
-    if (isInvalidFcmTokenError(errorText)) invalidTokens.push(token);
-    else console.error(`Push FCM fallo (${response.status}):`, errorText.slice(0, 220));
+    if (isInvalidFcmTokenError(errorText)) {
+      invalidTokens.push(token);
+      result.invalid += 1;
+    } else {
+      const message = `fcm-${response.status}`;
+      result.errors.push(message);
+      console.error(`Push FCM fallo (${response.status}):`, errorText.slice(0, 220));
+    }
   }
   if (invalidTokens.length) await removeInvalidFcmTokens(invalidTokens);
+  return result;
 }
 
 function resolveErrorStatus(message) {

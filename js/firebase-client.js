@@ -33,6 +33,7 @@ const firebaseConfig = {
 };
 let messagingSupportPromise = null;
 let messagingClientPromise = null;
+let lastNotificationDiagnostic = null;
 
 function hasSupabasePublicApiConfig() {
   return Boolean(supabaseFunctionsUrl && supabaseAnonKey);
@@ -125,11 +126,19 @@ async function getCurrentUserAccessToken() {
       console.warn("No se pudo obtener la sesion de Supabase:", error.message || error);
       return "";
     }
-    return String(data?.session?.access_token || "");
+    const sessionToken = String(data?.session?.access_token || "");
+    if (sessionToken) return sessionToken;
+
+    const refreshed = await client.auth.refreshSession().catch(() => null);
+    return String(refreshed?.data?.session?.access_token || "");
   } catch (error) {
     console.warn("No se pudo obtener token de Supabase Auth:", error);
     return "";
   }
+}
+
+async function hasCurrentCrmSession() {
+  return Boolean(await getCurrentUserAccessToken());
 }
 
 async function postSupabaseCrmFunction(payload = {}) {
@@ -266,6 +275,9 @@ function getMessagingFailureReason(error, fallback = "token") {
   const message = String(error?.message || error || "").toLowerCase();
   const combined = `${code} ${message}`;
 
+  if (combined.includes("no autenticado") || combined.includes("not authenticated")) {
+    return "auth";
+  }
   if (combined.includes("permission-blocked") || combined.includes("permission denied")) {
     return "denied";
   }
@@ -282,6 +294,12 @@ function getMessagingFailureReason(error, fallback = "token") {
     return "network";
   }
   return fallback;
+}
+
+function isInvalidApplicationServerKeyError(error) {
+  const code = String(error?.code || "").toLowerCase();
+  const message = String(error?.message || error || "").toLowerCase();
+  return code.includes("invalid-vapid") || message.includes("applicationserverkey") || message.includes("vapid");
 }
 
 function getFirebaseApp() {
@@ -317,19 +335,99 @@ async function getMessagingServiceWorkerRegistration() {
     return null;
   }
   try {
-    const current =
-      (await navigator.serviceWorker.getRegistration("/")) ||
-      (await navigator.serviceWorker.getRegistration());
-    if (current) return current;
     const registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js", {
       scope: "/",
     });
-    await navigator.serviceWorker.ready.catch(() => registration);
-    return registration;
+    await registration.update?.().catch(() => {});
+    return await navigator.serviceWorker.ready.catch(() => registration);
   } catch (error) {
     console.warn("No se pudo registrar Service Worker de Firebase Messaging:", error);
     return null;
   }
+}
+
+async function getNotificationDiagnostics(serviceWorkerRegistration = null, error = null) {
+  const details = {
+    permission: typeof Notification !== "undefined" ? Notification.permission : "missing",
+    secure: typeof window !== "undefined" ? Boolean(window.isSecureContext) : false,
+    standalone: isStandaloneWebApp(),
+    platform: typeof navigator !== "undefined" ? navigator.platform || "" : "",
+    userAgent: typeof navigator !== "undefined" ? navigator.userAgent || "" : "",
+    swScope: serviceWorkerRegistration?.scope || "",
+    swScript:
+      serviceWorkerRegistration?.active?.scriptURL ||
+      serviceWorkerRegistration?.installing?.scriptURL ||
+      serviceWorkerRegistration?.waiting?.scriptURL ||
+      "",
+    swState:
+      serviceWorkerRegistration?.active?.state ||
+      serviceWorkerRegistration?.installing?.state ||
+      serviceWorkerRegistration?.waiting?.state ||
+      "",
+    pushPermission: "",
+    hasPushSubscription: false,
+    pushEndpoint: "",
+    errorCode: String(error?.code || ""),
+    errorMessage: String(error?.message || error || "").slice(0, 220),
+  };
+  try {
+    details.pushPermission = serviceWorkerRegistration?.pushManager?.permissionState
+      ? await serviceWorkerRegistration.pushManager.permissionState({ userVisibleOnly: true })
+      : "";
+  } catch (diagError) {
+    details.pushPermission = `error:${String(diagError?.name || diagError || "").slice(0, 40)}`;
+  }
+  try {
+    const subscription = await serviceWorkerRegistration?.pushManager?.getSubscription?.();
+    details.hasPushSubscription = Boolean(subscription);
+    details.pushEndpoint = subscription?.endpoint ? "yes" : "";
+  } catch (diagError) {
+    details.pushEndpoint = `error:${String(diagError?.name || diagError || "").slice(0, 40)}`;
+  }
+  lastNotificationDiagnostic = details;
+  return details;
+}
+
+async function resetPushSubscription(messaging, serviceWorkerRegistration) {
+  await deleteToken(messaging).catch(() => {});
+  try {
+    const subscription = await serviceWorkerRegistration.pushManager?.getSubscription?.();
+    await subscription?.unsubscribe?.();
+  } catch (error) {
+    console.warn("No se pudo limpiar la suscripcion push anterior:", error);
+  }
+}
+
+async function getReliableMessagingToken(messaging, vapidKey, serviceWorkerRegistration) {
+  await serviceWorkerRegistration.update?.().catch(() => {});
+  let token = "";
+  try {
+    token = normalizeNotificationToken(await getToken(messaging, {
+      vapidKey,
+      serviceWorkerRegistration,
+    }));
+  } catch (error) {
+    if (!isInvalidApplicationServerKeyError(error)) throw error;
+    console.warn("Clave VAPID invalida; intentando token FCM con clave predeterminada de Firebase:", error);
+    token = normalizeNotificationToken(await getToken(messaging, {
+      serviceWorkerRegistration,
+    }));
+  }
+  if (token) return token;
+
+  await resetPushSubscription(messaging, serviceWorkerRegistration);
+  try {
+    token = normalizeNotificationToken(await getToken(messaging, {
+      vapidKey,
+      serviceWorkerRegistration,
+    }));
+  } catch (error) {
+    if (!isInvalidApplicationServerKeyError(error)) throw error;
+    token = normalizeNotificationToken(await getToken(messaging, {
+      serviceWorkerRegistration,
+    }));
+  }
+  return token;
 }
 
 export async function fetchOrders() {
@@ -539,6 +637,9 @@ export async function registerForOrderNotifications({ vapidKey, deviceLabel = ""
   if (Notification.permission === "denied") {
     return { ok: false, reason: "denied" };
   }
+  if (!(await hasCurrentCrmSession())) {
+    return { ok: false, reason: "auth" };
+  }
 
   const permission = await Notification.requestPermission().catch((error) => {
     console.warn("No se pudo pedir permiso de notificaciones:", error);
@@ -566,30 +667,19 @@ export async function registerForOrderNotifications({ vapidKey, deviceLabel = ""
 
   let token = "";
   try {
-    token = normalizeNotificationToken(await getToken(messaging, {
-      vapidKey: normalizedVapid,
-      serviceWorkerRegistration,
-    }));
+    token = await getReliableMessagingToken(messaging, normalizedVapid, serviceWorkerRegistration);
   } catch (error) {
     console.warn("No se pudo obtener token push de Firebase Messaging:", error);
-    return { ok: false, reason: getMessagingFailureReason(error, "token") };
+    const diagnostics = await getNotificationDiagnostics(serviceWorkerRegistration, error);
+    return { ok: false, reason: getMessagingFailureReason(error, "token"), diagnostics };
   }
   if (!token) {
-    console.warn("Firebase Messaging no devolvio token.", {
-      permission: Notification.permission,
-      hasServiceWorkerRegistration: Boolean(serviceWorkerRegistration),
-      serviceWorkerScope: serviceWorkerRegistration?.scope || "",
-      hasPushSubscription: Boolean(existingSubscription),
-      pushEndpoint: existingSubscription?.endpoint || "",
-      platform: typeof navigator !== "undefined" ? navigator.platform || "" : "",
-      userAgent: typeof navigator !== "undefined" ? navigator.userAgent || "" : "",
-      standalone: isStandaloneWebApp(),
-      secureContext: typeof window !== "undefined" ? Boolean(window.isSecureContext) : false,
-    });
+    const diagnostics = await getNotificationDiagnostics(serviceWorkerRegistration);
+    console.warn("Firebase Messaging no devolvio token.", diagnostics);
     if (isIosDevice() && isStandaloneWebApp()) {
-      return { ok: false, reason: "ios-reinstall" };
+      return { ok: false, reason: "ios-reinstall", diagnostics };
     }
-    return { ok: false, reason: "token" };
+    return { ok: false, reason: "token", diagnostics };
   }
   try {
     await postSupabaseCrmFunction({
@@ -599,7 +689,8 @@ export async function registerForOrderNotifications({ vapidKey, deviceLabel = ""
     });
   } catch (error) {
     console.warn("No se pudo registrar token push en CRM:", error);
-    return { ok: false, reason: getMessagingFailureReason(error, "register") };
+    const diagnostics = await getNotificationDiagnostics(serviceWorkerRegistration, error);
+    return { ok: false, reason: getMessagingFailureReason(error, "register"), diagnostics };
   }
   return {
     ok: true,
@@ -619,6 +710,9 @@ export async function refreshOrderNotificationRegistration({ vapidKey, deviceLab
   if (Notification.permission !== "granted") {
     return { ok: false, reason: Notification.permission === "denied" ? "denied" : "permission-required" };
   }
+  if (!(await hasCurrentCrmSession())) {
+    return { ok: false, reason: "auth" };
+  }
 
   const messaging = await getMessagingClient();
   if (!messaging) {
@@ -631,15 +725,13 @@ export async function refreshOrderNotificationRegistration({ vapidKey, deviceLab
 
   let token = "";
   try {
-    token = normalizeNotificationToken(await getToken(messaging, {
-      vapidKey: normalizedVapid,
-      serviceWorkerRegistration,
-    }));
+    token = await getReliableMessagingToken(messaging, normalizedVapid, serviceWorkerRegistration);
   } catch (error) {
     console.warn("No se pudo refrescar token push de Firebase Messaging:", error);
-    return { ok: false, reason: getMessagingFailureReason(error, "token") };
+    const diagnostics = await getNotificationDiagnostics(serviceWorkerRegistration, error);
+    return { ok: false, reason: getMessagingFailureReason(error, "token"), diagnostics };
   }
-  if (!token) return { ok: false, reason: "token" };
+  if (!token) return { ok: false, reason: "token", diagnostics: await getNotificationDiagnostics(serviceWorkerRegistration) };
 
   try {
     await postSupabaseCrmFunction({
@@ -649,9 +741,14 @@ export async function refreshOrderNotificationRegistration({ vapidKey, deviceLab
     });
   } catch (error) {
     console.warn("No se pudo refrescar token push en CRM:", error);
-    return { ok: false, reason: getMessagingFailureReason(error, "register") };
+    const diagnostics = await getNotificationDiagnostics(serviceWorkerRegistration, error);
+    return { ok: false, reason: getMessagingFailureReason(error, "register"), diagnostics };
   }
   return { ok: true, token };
+}
+
+export function getLastNotificationDiagnostic() {
+  return lastNotificationDiagnostic;
 }
 
 export async function unregisterForOrderNotifications(token) {
@@ -670,6 +767,51 @@ export async function unregisterForOrderNotifications(token) {
     console.warn("No se pudo desactivar token push en CRM:", error);
     return false;
   }
+  return true;
+}
+
+export async function showOrderNotificationsReadyTest() {
+  return showCrmLocalNotification({
+    title: "Beky's Cake",
+    body: "Este celular esta listo para recibir notificaciones de pedidos.",
+    link: `${window.location.origin}/crm`,
+    tag: "bekys-notifications-ready",
+    requireInteraction: false,
+  });
+}
+
+export async function showCrmLocalNotification({
+  title = "Beky's Cake",
+  body = "",
+  link = "",
+  tag = "bekys-crm-alert",
+  requireInteraction = true,
+} = {}) {
+  if (typeof Notification === "undefined" || Notification.permission !== "granted") {
+    return false;
+  }
+  const safeTitle = normalizeInlineText(title, 120) || "Beky's Cake";
+  const safeBody = normalizeInlineText(body, 240) || "Revisa el CRM.";
+  const safeLink = normalizeInlineText(link || `${window.location.origin}/crm`, 600);
+  const safeTag = normalizeInlineText(tag, 160) || "bekys-crm-alert";
+  const serviceWorkerRegistration = await getMessagingServiceWorkerRegistration();
+  if (serviceWorkerRegistration?.showNotification) {
+    await serviceWorkerRegistration.showNotification(safeTitle, {
+      body: safeBody,
+      icon: "/assets/bekys_icon.png",
+      badge: "/assets/bekys_icon.png",
+      tag: safeTag,
+      renotify: true,
+      requireInteraction,
+      data: { link: safeLink },
+    });
+    return true;
+  }
+  new Notification(safeTitle, {
+    body: safeBody,
+    icon: "/assets/bekys_icon.png",
+    tag: safeTag,
+  });
   return true;
 }
 

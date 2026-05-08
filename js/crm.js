@@ -16,6 +16,8 @@ import {
   registerForOrderNotifications,
   refreshOrderNotificationRegistration,
   unregisterForOrderNotifications,
+  showOrderNotificationsReadyTest,
+  showCrmLocalNotification,
   listenForForegroundMessages,
 } from "./firebase-client.js";
 
@@ -59,6 +61,7 @@ let displayIdMap = {};
 let pendingDeepLinkOrderId = "";
 let notificationRefreshInProgress = false;
 let lastNotificationRefreshAt = 0;
+let notificationRefreshTimer = null;
 let orderNotesSaving = false;
 let orderNotesSavingOrderId = "";
 let orderNotesOriginalValue = "";
@@ -200,6 +203,7 @@ const i18n = {
     crm_notifications_token:
       "Firebase no devolvio un token. Recarga la pagina, confirma que el permiso este permitido e intenta de nuevo.",
     crm_notifications_invalid_vapid: "La clave Web Push de Firebase no coincide con este proyecto.",
+    crm_notifications_auth: "Inicia sesion en el CRM y vuelve a activar las notificaciones.",
     crm_notifications_register: "Se genero el token, pero no se pudo guardar en el CRM. Intenta iniciar sesion de nuevo.",
     crm_notifications_network: "No se pudo conectar para activar las notificaciones. Revisa tu internet.",
     crm_notifications_error: "No se pudieron activar las notificaciones.",
@@ -395,6 +399,7 @@ const i18n = {
     crm_notifications_token:
       "Firebase did not return a token. Reload the page, confirm permission is allowed, and try again.",
     crm_notifications_invalid_vapid: "The Firebase Web Push key does not match this project.",
+    crm_notifications_auth: "Sign in to the CRM and enable notifications again.",
     crm_notifications_register: "The token was generated, but it could not be saved in the CRM. Try signing in again.",
     crm_notifications_network: "Could not connect to enable notifications. Check your internet connection.",
     crm_notifications_error: "Notifications could not be enabled.",
@@ -644,9 +649,28 @@ function getNotificationErrorMessage(reason) {
   if (reason === "service-worker") return t("crm_notifications_service_worker");
   if (reason === "token") return t("crm_notifications_token");
   if (reason === "invalid-vapid") return t("crm_notifications_invalid_vapid");
+  if (reason === "auth") return t("crm_notifications_auth");
   if (reason === "register") return t("crm_notifications_register");
   if (reason === "network") return t("crm_notifications_network");
   return t("crm_notifications_error");
+}
+
+function formatNotificationDiagnostics(diagnostics) {
+  if (!diagnostics || typeof diagnostics !== "object") return "";
+  const browser = /Chrome\/([\d.]+)/i.exec(String(diagnostics.userAgent || ""))?.[1] || "";
+  const android = /Android\s+([\d.]+)/i.exec(String(diagnostics.userAgent || ""))?.[1] || "";
+  const swFile = String(diagnostics.swScript || "").split("/").pop() || "sin-sw";
+  const parts = [
+    `permiso=${diagnostics.permission || "n/a"}`,
+    `push=${diagnostics.pushPermission || "n/a"}`,
+    `sw=${swFile}${diagnostics.swState ? `:${diagnostics.swState}` : ""}`,
+    `sub=${diagnostics.hasPushSubscription ? "si" : "no"}`,
+  ];
+  if (android) parts.push(`android=${android}`);
+  if (browser) parts.push(`chrome=${browser}`);
+  if (diagnostics.errorCode) parts.push(`codigo=${diagnostics.errorCode}`);
+  if (diagnostics.errorMessage) parts.push(`error=${diagnostics.errorMessage}`);
+  return ` Diagnostico: ${parts.join(" | ")}`;
 }
 
 async function ensureForegroundMessagesListener() {
@@ -654,16 +678,25 @@ async function ensureForegroundMessagesListener() {
   detachForegroundMessages = await listenForForegroundMessages((payload) => {
     const title = payload?.notification?.title || "";
     const body = payload?.notification?.body || "";
+    const link = payload?.data?.link || `${window.location.origin}/crm`;
+    const tag = payload?.data?.orderId || payload?.data?.quoteId || "bekys-crm-alert";
     const message = title
       ? `${title}${body ? ` - ${body}` : ""}`
       : t("crm_notifications_foreground");
     setNotificationMessage(message, "success");
+    void showCrmLocalNotification({
+      title: title || "Beky's Cake",
+      body: body || t("crm_notifications_foreground"),
+      link,
+      tag,
+    });
   });
 }
 
 async function refreshStoredNotificationRegistration() {
   const storedToken = localStorage.getItem(notificationsTokenKey);
-  if (!storedToken || notificationRefreshInProgress) return;
+  const crmBody = document.getElementById("crm-body");
+  if (crmBody?.classList.contains("locked") || notificationRefreshInProgress) return;
   if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
   const now = Date.now();
   if (now - lastNotificationRefreshAt < 5 * 60 * 1000) return;
@@ -679,6 +712,8 @@ async function refreshStoredNotificationRegistration() {
       localStorage.setItem(notificationsTokenKey, result.token);
       updateNotificationButtons(true);
       void ensureForegroundMessagesListener();
+    } else if (!storedToken) {
+      updateNotificationButtons(false);
     }
   } catch (error) {
     console.warn("No se pudo refrescar el registro de notificaciones:", error);
@@ -795,10 +830,14 @@ async function enableNotifications() {
       updateNotificationButtons(true);
       setNotificationMessage(t("crm_notifications_enabled"), "success");
       void ensureForegroundMessagesListener();
+      void showOrderNotificationsReadyTest();
       return;
     }
     updateNotificationButtons(false);
-    setNotificationMessage(getNotificationErrorMessage(result?.reason), "error");
+    setNotificationMessage(
+      `${getNotificationErrorMessage(result?.reason)}${formatNotificationDiagnostics(result?.diagnostics)}`,
+      "error"
+    );
   } catch (error) {
     console.warn("No se pudieron activar las notificaciones:", error);
     updateNotificationButtons(false);
@@ -832,12 +871,25 @@ function initNotifications() {
   crmToastEl = document.getElementById("crm-toast");
   if (!notificationsEnableBtn || !notificationsDisableBtn) return;
   const storedToken = localStorage.getItem(notificationsTokenKey);
-  updateNotificationButtons(Boolean(storedToken));
+  const notificationsAlreadyAllowed = typeof Notification !== "undefined" && Notification.permission === "granted";
+  updateNotificationButtons(Boolean(storedToken || notificationsAlreadyAllowed));
   notificationsEnableBtn.addEventListener("click", enableNotifications);
   notificationsDisableBtn.addEventListener("click", disableNotifications);
   if (storedToken) {
     void ensureForegroundMessagesListener();
   }
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) void refreshStoredNotificationRegistration();
+  });
+  window.addEventListener("focus", () => {
+    void refreshStoredNotificationRegistration();
+  });
+  window.addEventListener("online", () => {
+    void refreshStoredNotificationRegistration();
+  });
+  notificationRefreshTimer = window.setInterval(() => {
+    void refreshStoredNotificationRegistration();
+  }, 12 * 60 * 60 * 1000);
 }
 
 const statusBuckets = {

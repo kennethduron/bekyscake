@@ -2956,6 +2956,24 @@ body.menu-open .whatsapp-fixed {
     flex: 1 1 auto;
     text-align: center;
   }
+  .summary-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .summary-card {
+    min-height: 112px;
+    padding: 12px;
+    align-content: space-between;
+  }
+  .summary-card p {
+    font-size: 0.78rem;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+  }
+  .summary-card strong {
+    font-size: 1.35rem;
+    line-height: 1.1;
+  }
   .calendar-shell {
     padding-bottom: 6px;
     overflow-x: auto;
