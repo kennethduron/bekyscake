@@ -530,7 +530,11 @@ function fixMojibake(value) {
 
 function t(key) {
   const dict = i18n[currentLang] || i18n.es;
-  const raw = dict[key] || i18n.es[key] || key;
+  const raw = Object.prototype.hasOwnProperty.call(dict, key)
+    ? dict[key]
+    : Object.prototype.hasOwnProperty.call(i18n.es, key)
+      ? i18n.es[key]
+      : key;
   return fixMojibake(raw);
 }
 
