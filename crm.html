@@ -86,6 +86,23 @@
                   data-i18n="crm_summary_tab_month">Mes</button>
               </div>
             </div>
+            <div class="notifications-card notifications-card--top">
+              <div class="notifications-copy">
+                <p class="eyebrow" data-i18n="crm_notifications_title">Notificaciones</p>
+                <p data-i18n="crm_notifications_body">
+                  Recibe alertas en tu celular o computadora cuando haya nuevos pedidos o cotizaciones.
+                </p>
+              </div>
+              <div class="notifications-control">
+                <div class="notifications-actions">
+                  <button class="btn primary" type="button" id="enable-notifications"
+                    data-i18n="crm_notifications_enable">Activar notificaciones</button>
+                  <button class="btn ghost hidden" type="button" id="disable-notifications"
+                    data-i18n="crm_notifications_disable">Desactivar</button>
+                </div>
+                <p class="notification-message" id="notification-message" aria-live="polite"></p>
+              </div>
+            </div>
             <div class="summary-range" id="summary-range-label">Resumen (Hoy)</div>
             <div class="summary-grid">
               <div class="summary-block">
@@ -199,27 +216,6 @@
               data-i18n="crm_filter_delivered">Entregado</button>
           </div>
           <div class="order-cards" id="orders-cards"></div>
-        </div>
-      </section>
-
-      <section class="crm notifications-panel">
-        <div class="section-heading">
-          <p class="eyebrow" data-i18n="crm_notifications_title">Notificaciones</p>
-          <h2 data-i18n="crm_notifications_title">Notificaciones</h2>
-          <p data-i18n="crm_notifications_body">
-            Recibe alertas en tu celular o computadora cuando haya nuevos pedidos o cotizaciones.
-          </p>
-        </div>
-        <div class="crm-grid">
-          <div class="crm-panel notifications-card">
-            <div class="notifications-actions">
-              <button class="btn primary" type="button" id="enable-notifications"
-                data-i18n="crm_notifications_enable">Activar notificaciones</button>
-              <button class="btn ghost hidden" type="button" id="disable-notifications"
-                data-i18n="crm_notifications_disable">Desactivar</button>
-            </div>
-            <p class="notification-message" id="notification-message" aria-live="polite"></p>
-          </div>
         </div>
       </section>
 

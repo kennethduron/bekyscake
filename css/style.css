@@ -1242,23 +1242,61 @@ main {
   box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
   border: 1px solid rgba(14, 165, 233, 0.1);
 }
-.notifications-panel {
-  margin-top: 60px;
-}
 .notifications-card {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+.notifications-card--top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  margin: 4px 0 16px;
+  padding: 14px 16px;
+  border: 1px solid rgba(91, 46, 31, 0.14);
+  border-radius: 14px;
+  background: #fffaf4;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+.notifications-copy {
+  min-width: 0;
+}
+.notifications-copy .eyebrow {
+  margin: 0 0 4px;
+  font-size: 0.72rem;
+}
+.notifications-copy p:last-child {
+  margin: 0;
+  color: #6b4b3e;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+.notifications-control {
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+  min-width: min(100%, 260px);
 }
 .notifications-actions {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
 }
+.notifications-card--top .notifications-actions {
+  justify-content: flex-end;
+}
+.notifications-card--top .btn {
+  min-height: 42px;
+  padding: 10px 18px;
+  white-space: nowrap;
+}
 .notification-message {
   margin: 0;
   min-height: 22px;
   color: #6b4b3e;
+  font-size: 0.9rem;
+  line-height: 1.35;
 }
 .notification-message.success {
   color: #166534;
@@ -2955,6 +2993,23 @@ body.menu-open .whatsapp-fixed {
   .summary-tab {
     flex: 1 1 auto;
     text-align: center;
+  }
+  .notifications-card--top {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+    gap: 12px;
+    padding: 14px;
+  }
+  .notifications-control {
+    justify-items: stretch;
+    min-width: 0;
+  }
+  .notifications-card--top .notifications-actions {
+    justify-content: stretch;
+  }
+  .notifications-card--top .btn {
+    width: 100%;
+    justify-content: center;
   }
   .summary-cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
