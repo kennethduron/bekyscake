@@ -77,30 +77,24 @@
                   </div>
                 </div>
               </div>
-              <div class="summary-tabs" role="tablist" aria-label="Resumen">
-                <button class="summary-tab active" type="button" data-range="day"
-                  data-i18n="crm_summary_tab_day">Hoy</button>
-                <button class="summary-tab" type="button" data-range="week"
-                  data-i18n="crm_summary_tab_week">Semana</button>
-                <button class="summary-tab" type="button" data-range="month"
-                  data-i18n="crm_summary_tab_month">Mes</button>
-              </div>
-            </div>
-            <div class="notifications-card notifications-card--top">
-              <div class="notifications-copy">
-                <p class="eyebrow" data-i18n="crm_notifications_title">Notificaciones</p>
-                <p data-i18n="crm_notifications_body">
-                  Recibe alertas en tu celular o computadora cuando haya nuevos pedidos o cotizaciones.
-                </p>
-              </div>
-              <div class="notifications-control">
-                <div class="notifications-actions">
-                  <button class="btn primary" type="button" id="enable-notifications"
-                    data-i18n="crm_notifications_enable">Activar notificaciones</button>
-                  <button class="btn ghost hidden" type="button" id="disable-notifications"
-                    data-i18n="crm_notifications_disable">Desactivar</button>
+              <div class="summary-controls">
+                <div class="notifications-control notifications-control--inline">
+                  <div class="notifications-actions">
+                    <button class="btn primary" type="button" id="enable-notifications"
+                      data-i18n="crm_notifications_enable">Activar notificaciones</button>
+                    <button class="btn ghost hidden" type="button" id="disable-notifications"
+                      data-i18n="crm_notifications_disable">Desactivar</button>
+                  </div>
+                  <p class="notification-message" id="notification-message" aria-live="polite"></p>
                 </div>
-                <p class="notification-message" id="notification-message" aria-live="polite"></p>
+                <div class="summary-tabs" role="tablist" aria-label="Resumen">
+                  <button class="summary-tab active" type="button" data-range="day"
+                    data-i18n="crm_summary_tab_day">Hoy</button>
+                  <button class="summary-tab" type="button" data-range="week"
+                    data-i18n="crm_summary_tab_week">Semana</button>
+                  <button class="summary-tab" type="button" data-range="month"
+                    data-i18n="crm_summary_tab_month">Mes</button>
+                </div>
               </div>
             </div>
             <div class="summary-range" id="summary-range-label">Resumen (Hoy)</div>
